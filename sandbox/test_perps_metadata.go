@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	client := hyperliquid.New("", "", "")
+	client := hyperliquid.New("", "")
 
 	res, err := client.RetrievePerpetualsMetadata(context.Background())
 	if err != nil {

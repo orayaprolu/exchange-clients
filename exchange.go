@@ -19,6 +19,7 @@ type HttpClient interface {
 	CancelOrder(ctx context.Context, req CancelOrderRequest) (CancelOrderResponse, error)
 	ModifyOrder(ctx context.Context, req ModifyOrderRequest) (ModifyOrderResponse, error)
 	GetOrderbook(ctx context.Context, pair string) (Orderbook, error)
+	GetFundingRate(ctx context.Context, pair string) (FundingRate, error)
 }
 
 type WebsocketClient interface {

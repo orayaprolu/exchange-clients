@@ -11,12 +11,12 @@ import (
 )
 
 type Client struct {
-	httpUrl      string
-	exchangeUrl  string
-	wsUrl        string
-	exchange     string // HIP-3 deployer prefix (e.g. "flx", "hyna"). Empty for native HL perps.
-	mu           sync.Mutex
-	conns        []*wsConn
+	httpUrl     string
+	exchangeUrl string
+	wsUrl       string
+	exchange    string // HIP-3 deployer prefix (e.g. "flx", "hyna"). Empty for native HL perps.
+	mu          sync.Mutex
+	conns       []*wsConn
 
 	// Order placement fields
 	privateKey *ecdsa.PrivateKey
@@ -34,12 +34,12 @@ type Client struct {
 }
 
 type wsConn struct {
-	wsUrl        string
-	subType      string
-	subParams    map[string]string // extra subscription params (e.g. "coin" or "user")
-	conn         *websocket.Conn
-	mu           sync.Mutex
-	msgCh        chan []byte
+	wsUrl     string
+	subType   string
+	subParams map[string]string // extra subscription params (e.g. "coin" or "user")
+	conn      *websocket.Conn
+	mu        sync.Mutex
+	msgCh     chan []byte
 }
 
 // Wire types for websocket JSON messages.
@@ -87,10 +87,10 @@ type wsActionPayload struct {
 }
 
 type wsSignedAction struct {
-	Action       any          `json:"action"`
-	Nonce        int64        `json:"nonce"`
-	Signature    wsSignature  `json:"signature"`
-	VaultAddress *string      `json:"vaultAddress"`
+	Action       any         `json:"action"`
+	Nonce        int64       `json:"nonce"`
+	Signature    wsSignature `json:"signature"`
+	VaultAddress *string     `json:"vaultAddress"`
 }
 
 type wsSignature struct {
@@ -195,10 +195,10 @@ type wsOrderResting struct {
 }
 
 type wsOrderFilled struct {
-	OID        int64  `json:"oid"`
-	TotalSz    string `json:"totalSz"`
-	AvgPx      string `json:"avgPx"`
-	Cloid      string `json:"cloid,omitempty"`
+	OID     int64  `json:"oid"`
+	TotalSz string `json:"totalSz"`
+	AvgPx   string `json:"avgPx"`
+	Cloid   string `json:"cloid,omitempty"`
 }
 
 // Wire type for order update subscription.
@@ -211,7 +211,7 @@ type wsOrderUpdateMessage struct {
 type wsOrderUpdate struct {
 	Order           wsBasicOrder `json:"order"`
 	Status          string       `json:"status"`
-	StatusTimestamp  int64        `json:"statusTimestamp"`
+	StatusTimestamp int64        `json:"statusTimestamp"`
 }
 
 type wsBasicOrder struct {
@@ -233,4 +233,26 @@ type wsMeta struct {
 
 type wsAssetMeta struct {
 	Name string `json:"name"`
+}
+
+// Funding rate types for metaAndAssetCtxs endpoint
+
+type AssetContext struct {
+	DayNtlVlm    string   `json:"dayNtlVlm"`
+	Funding      string   `json:"funding"`
+	ImpactPxs    []string `json:"impactPxs"`
+	MarkPx       string   `json:"markPx"`
+	MidPx        string   `json:"midPx"`
+	OpenInterest string   `json:"openInterest"`
+	OraclePx     string   `json:"oraclePx"`
+	Premium      string   `json:"premium"`
+	PrevDayPx    string   `json:"prevDayPx"`
+	DayBaseVlm   string   `json:"dayBaseVlm,omitempty"`
+}
+
+type MetaAndAssetCtxsResponse struct {
+	Meta struct {
+		Universe []wsAssetMeta `json:"universe"`
+	} `json:"universe"`
+	AssetCtxs []AssetContext `json:"assetCtxs"`
 }

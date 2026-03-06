@@ -100,5 +100,16 @@ type OrderUpdate struct {
 	Cloid           string
 	Timestamp       int64
 	Status          string // e.g. "open", "filled", "canceled", "triggered", "rejected", "marginCanceled"
-	StatusTimestamp  int64
+	StatusTimestamp int64
+}
+
+type FundingRate struct {
+	Coin         string
+	FundingRate  decimal.Decimal
+	MarkPrice    decimal.Decimal
+	OraclePrice  decimal.Decimal
+	Premium      decimal.Decimal
+	OpenInterest decimal.Decimal
+	DayVolume    decimal.Decimal
+	PrevDayPrice decimal.Decimal
 }

@@ -24,7 +24,7 @@ func main() {
 		log.Fatal("set HL_PRIVATE_KEY in .env or as env var")
 	}
 
-	client := hyperliquid.New("", privKey, "hyna")
+	client := hyperliquid.New(privKey, "hyna")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
