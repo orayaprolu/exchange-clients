@@ -13,7 +13,7 @@ import (
 
 // exchange is the HIP-3 deployer prefix (e.g. "flx", "hyna", "xyz").
 // Pass empty string for native Hyperliquid perps.
-func New(apiKey, apiSecret, exchange string) *Client {
+func New(privateKey, exchange string) *Client {
 	c := &Client{
 		httpUrl:     "https://api.hyperliquid.xyz/info",
 		exchangeUrl: "https://api.hyperliquid.xyz/exchange",
@@ -22,8 +22,8 @@ func New(apiKey, apiSecret, exchange string) *Client {
 		pending:     make(map[int64]chan wsPostResponse),
 	}
 
-	if apiSecret != "" {
-		key, err := crypto.HexToECDSA(strings.TrimPrefix(apiSecret, "0x"))
+	if privateKey != "" {
+		key, err := crypto.HexToECDSA(strings.TrimPrefix(privateKey, "0x"))
 		if err == nil {
 			c.privateKey = key
 			c.address = crypto.PubkeyToAddress(key.PublicKey)
