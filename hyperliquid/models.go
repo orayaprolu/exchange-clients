@@ -25,6 +25,10 @@ type Client struct {
 	assetMap     map[string]int
 	assetMapOnce sync.Once
 
+	spotPairMap     map[string]string // "BASE/QUOTE" -> HL pair name (e.g. "@150")
+	spotPairMapOnce sync.Once
+	spotPairMapErr  error
+
 	orderConnOnce sync.Once
 	orderConn     *wsConn
 	orderConnErr  error

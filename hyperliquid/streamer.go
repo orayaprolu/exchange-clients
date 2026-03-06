@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 
 	exchangeclients "github.com/orayaprolu/exchange-clients"
 
@@ -12,7 +13,11 @@ import (
 )
 
 func (c *Client) StreamOrderbook(ctx context.Context, pair string) (<-chan exchangeclients.Orderbook, error) {
-	wc, err := c.newWsConn(ctx, "l2Book", map[string]string{"coin": c.coin(pair)})
+	coin, err := c.streamCoin(ctx, pair)
+	if err != nil {
+		return nil, err
+	}
+	wc, err := c.newWsConn(ctx, "l2Book", map[string]string{"coin": coin})
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +57,14 @@ func (c *Client) StreamOrderbook(ctx context.Context, pair string) (<-chan excha
 }
 
 func (c *Client) StreamBBO(ctx context.Context, pair string) (<-chan exchangeclients.BBO, error) {
-	wc, err := c.newWsConn(ctx, "bbo", map[string]string{"coin": c.coin(pair)})
+	if strings.Contains(pair, "/") {
+		return nil, fmt.Errorf("hyperliquid: bbo stream is not supported for spot pairs (use StreamOrderbook instead)")
+	}
+	coin, err := c.streamCoin(ctx, pair)
+	if err != nil {
+		return nil, err
+	}
+	wc, err := c.newWsConn(ctx, "bbo", map[string]string{"coin": coin})
 	if err != nil {
 		return nil, err
 	}

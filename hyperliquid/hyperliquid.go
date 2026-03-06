@@ -42,6 +42,88 @@ func (c *Client) coin(pair string) string {
 	return c.exchange + ":" + pair
 }
 
+// streamCoin returns the coin identifier for a WebSocket subscription.
+// Spot pairs (containing "/") are resolved to the Hyperliquid pair name (e.g. "@150").
+// Perp pairs use the exchange-prefixed form via coin().
+func (c *Client) streamCoin(ctx context.Context, pair string) (string, error) {
+	if strings.Contains(pair, "/") {
+		return c.resolveSpotCoin(ctx, pair)
+	}
+	return c.coin(pair), nil
+}
+
+// loadSpotMeta fetches the global spot token and universe metadata once
+// and populates spotPairMap with "BASE/QUOTE" -> HL pair name entries.
+func (c *Client) loadSpotMeta(ctx context.Context) error {
+	c.spotPairMapOnce.Do(func() {
+		c.spotPairMap = make(map[string]string)
+
+		req, err := http.NewRequestWithContext(ctx, "POST", c.httpUrl, strings.NewReader(`{"type":"spotMeta"}`))
+		if err != nil {
+			c.spotPairMapErr = err
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			c.spotPairMapErr = err
+			return
+		}
+		defer res.Body.Close()
+
+		b, err := io.ReadAll(res.Body)
+		if err != nil {
+			c.spotPairMapErr = err
+			return
+		}
+
+		var meta struct {
+			Tokens []struct {
+				Name  string `json:"name"`
+				Index int    `json:"index"`
+			} `json:"tokens"`
+			Universe []struct {
+				Tokens []int  `json:"tokens"`
+				Name   string `json:"name"`
+			} `json:"universe"`
+		}
+		if err := json.Unmarshal(b, &meta); err != nil {
+			c.spotPairMapErr = err
+			return
+		}
+
+		tokenNames := make(map[int]string, len(meta.Tokens))
+		for _, t := range meta.Tokens {
+			tokenNames[t.Index] = t.Name
+		}
+
+		for _, u := range meta.Universe {
+			if len(u.Tokens) < 2 {
+				continue
+			}
+			base := tokenNames[u.Tokens[0]]
+			quote := tokenNames[u.Tokens[1]]
+			if base != "" && quote != "" {
+				c.spotPairMap[base+"/"+quote] = u.Name
+			}
+		}
+	})
+	return c.spotPairMapErr
+}
+
+// resolveSpotCoin maps a "BASE/QUOTE" pair to the Hyperliquid spot pair name.
+func (c *Client) resolveSpotCoin(ctx context.Context, pair string) (string, error) {
+	if err := c.loadSpotMeta(ctx); err != nil {
+		return "", fmt.Errorf("load spot meta: %w", err)
+	}
+	name, ok := c.spotPairMap[pair]
+	if !ok {
+		return "", fmt.Errorf("unknown spot pair: %s", pair)
+	}
+	return name, nil
+}
+
 func (c *Client) RetrievePerpetualsMetadata(ctx context.Context) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", c.httpUrl, strings.NewReader(`{"type":"perpDexs"}`))
 	if err != nil {
