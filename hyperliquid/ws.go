@@ -111,11 +111,14 @@ func (c *Client) getOrderConn(ctx context.Context) (*wsConn, error) {
 	return c.orderConn, c.orderConnErr
 }
 
-// WarmOrderConn eagerly establishes the order WebSocket connection
-// so the first order doesn't pay for dial + TLS handshake latency.
+// WarmOrderConn eagerly establishes the order WebSocket connection and
+// pre-loads the asset index map so the first order doesn't pay for
+// dial + TLS handshake + metadata HTTP fetches.
 func (c *Client) WarmOrderConn() error {
-	_, err := c.getOrderConn(c.bgCtx)
-	return err
+	if _, err := c.getOrderConn(c.bgCtx); err != nil {
+		return err
+	}
+	return c.loadAssetMap(c.bgCtx)
 }
 
 // resetReadDeadline extends the read deadline so stale connections are detected.
