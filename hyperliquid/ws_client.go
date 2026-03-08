@@ -282,10 +282,6 @@ func parseWsPayload(resp wsPostResponse) (status string, statuses []json.RawMess
 }
 
 func parseOrderResponse(resp wsPostResponse) exchangeclients.PlaceOrderResponse {
-	// Debug: log raw response
-	rawRespDebug, _ := json.Marshal(resp)
-	log.Printf("DEBUG: Raw order response: %s", string(rawRespDebug))
-
 	status, statuses, rawResp := parseWsPayload(resp)
 
 	if status != "ok" {
