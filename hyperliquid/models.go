@@ -1,6 +1,7 @@
 package hyperliquid
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"sync"
@@ -17,6 +18,10 @@ type Client struct {
 	exchange    string // HIP-3 deployer prefix (e.g. "flx", "hyna"). Empty for native HL perps.
 	mu          sync.Mutex
 	conns       []*wsConn
+
+	// Background context for long-lived goroutines (readLoop, pingLoop, orderResponseLoop).
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
 
 	// Order placement fields
 	privateKey *ecdsa.PrivateKey

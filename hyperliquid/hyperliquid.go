@@ -16,12 +16,15 @@ import (
 // exchange is the HIP-3 deployer prefix (e.g. "flx", "hyna", "xyz").
 // Pass empty string for native Hyperliquid perps.
 func New(privateKey, exchange string) *Client {
+	ctx, cancel := context.WithCancel(context.Background())
 	c := &Client{
 		httpUrl:     "https://api.hyperliquid.xyz/info",
 		exchangeUrl: "https://api.hyperliquid.xyz/exchange",
 		wsUrl:       "wss://api.hyperliquid.xyz/ws",
 		exchange:    exchange,
 		pending:     make(map[int64]chan wsPostResponse),
+		bgCtx:       ctx,
+		bgCancel:    cancel,
 	}
 
 	if privateKey != "" {
@@ -33,6 +36,12 @@ func New(privateKey, exchange string) *Client {
 	}
 
 	return c
+}
+
+// Close cancels all background goroutines (readLoop, pingLoop, orderResponseLoop)
+// and releases resources.
+func (c *Client) Close() {
+	c.bgCancel()
 }
 
 func (c *Client) coin(pair string) string {

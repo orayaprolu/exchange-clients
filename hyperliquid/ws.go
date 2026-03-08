@@ -97,17 +97,25 @@ func (wc *wsConn) dial() error {
 }
 
 // getOrderConn lazily creates a websocket connection for posting orders.
+// Uses the client's background context so goroutines outlive any individual order.
 func (c *Client) getOrderConn(ctx context.Context) (*wsConn, error) {
 	c.orderConnOnce.Do(func() {
-		wc, err := c.newWsConn(ctx, "", nil)
+		wc, err := c.newWsConn(c.bgCtx, "", nil)
 		if err != nil {
 			c.orderConnErr = err
 			return
 		}
 		c.orderConn = wc
-		go c.orderResponseLoop(ctx)
+		go c.orderResponseLoop(c.bgCtx)
 	})
 	return c.orderConn, c.orderConnErr
+}
+
+// WarmOrderConn eagerly establishes the order WebSocket connection
+// so the first order doesn't pay for dial + TLS handshake latency.
+func (c *Client) WarmOrderConn() error {
+	_, err := c.getOrderConn(c.bgCtx)
+	return err
 }
 
 // resetReadDeadline extends the read deadline so stale connections are detected.
