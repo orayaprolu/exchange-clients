@@ -46,6 +46,7 @@ type wsConn struct {
 	wsUrl     string
 	subType   string
 	subParams map[string]string // extra subscription params (e.g. "coin" or "user")
+	subs      []map[string]string // multiple subscriptions (for mux connections)
 	conn      *websocket.Conn
 	mu        sync.Mutex
 	msgCh     chan []byte

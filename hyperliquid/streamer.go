@@ -56,6 +56,62 @@ func (c *Client) StreamOrderbook(ctx context.Context, pair string) (<-chan excha
 	return ch, nil
 }
 
+// StreamOrderbookMulti subscribes to L2 orderbook updates for multiple pairs
+// over a single WebSocket connection. All updates are delivered on one channel
+// with the Coin field identifying the source.
+func (c *Client) StreamOrderbookMulti(ctx context.Context, pairs []string) (<-chan exchangeclients.Orderbook, error) {
+	if len(pairs) == 0 {
+		return nil, fmt.Errorf("hyperliquid: StreamOrderbookMulti requires at least one pair")
+	}
+
+	var subs []map[string]string
+	for _, pair := range pairs {
+		coin, err := c.streamCoin(ctx, pair)
+		if err != nil {
+			return nil, err
+		}
+		subs = append(subs, map[string]string{"type": "l2Book", "coin": coin})
+	}
+
+	wc, err := c.newMuxWsConn(ctx, subs)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan exchangeclients.Orderbook, 64)
+	go func() {
+		defer close(ch)
+		for msg := range wc.msgCh {
+			var raw wsBookMessage
+			if err := json.Unmarshal(msg, &raw); err != nil {
+				log.Printf("hyperliquid: orderbook multi unmarshal error: %v", err)
+				continue
+			}
+			if raw.Channel != "l2Book" {
+				continue
+			}
+
+			bids, err := convertLevels(raw.Data.Levels[0])
+			if err != nil {
+				log.Printf("hyperliquid: orderbook multi bid parse error for %s: %v", raw.Data.Coin, err)
+				continue
+			}
+			asks, err := convertLevels(raw.Data.Levels[1])
+			if err != nil {
+				log.Printf("hyperliquid: orderbook multi ask parse error for %s: %v", raw.Data.Coin, err)
+				continue
+			}
+
+			select {
+			case ch <- exchangeclients.Orderbook{Coin: raw.Data.Coin, Bids: bids, Asks: asks, Time: raw.Data.Time}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
 func (c *Client) StreamBBO(ctx context.Context, pair string) (<-chan exchangeclients.BBO, error) {
 	if strings.Contains(pair, "/") {
 		return nil, fmt.Errorf("hyperliquid: bbo stream is not supported for spot pairs (use StreamOrderbook instead)")
@@ -94,6 +150,71 @@ func (c *Client) StreamBBO(ctx context.Context, pair string) (<-chan exchangecli
 				bbo.AskPrice, bbo.AskSize, err = parseLevel(ask)
 				if err != nil {
 					log.Printf("hyperliquid: bbo ask parse error for %s: %v", pair, err)
+					continue
+				}
+			}
+
+			select {
+			case ch <- bbo:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
+// StreamBBOMulti subscribes to BBO updates for multiple pairs over a single
+// WebSocket connection. All updates are delivered on one channel with the Coin
+// field identifying the source. This is much more efficient than calling
+// StreamBBO per-pair when collecting data for many symbols.
+func (c *Client) StreamBBOMulti(ctx context.Context, pairs []string) (<-chan exchangeclients.BBO, error) {
+	if len(pairs) == 0 {
+		return nil, fmt.Errorf("hyperliquid: StreamBBOMulti requires at least one pair")
+	}
+
+	var subs []map[string]string
+	for _, pair := range pairs {
+		if strings.Contains(pair, "/") {
+			return nil, fmt.Errorf("hyperliquid: bbo stream is not supported for spot pair %q (use StreamOrderbook instead)", pair)
+		}
+		coin, err := c.streamCoin(ctx, pair)
+		if err != nil {
+			return nil, err
+		}
+		subs = append(subs, map[string]string{"type": "bbo", "coin": coin})
+	}
+
+	wc, err := c.newMuxWsConn(ctx, subs)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan exchangeclients.BBO, 64)
+	go func() {
+		defer close(ch)
+		for msg := range wc.msgCh {
+			var raw wsBboMessage
+			if err := json.Unmarshal(msg, &raw); err != nil {
+				log.Printf("hyperliquid: bbo multi unmarshal error: %v", err)
+				continue
+			}
+			if raw.Channel != "bbo" {
+				continue
+			}
+
+			bbo := exchangeclients.BBO{Coin: raw.Data.Coin, Time: raw.Data.Time}
+			if bid := raw.Data.Bbo[0]; bid != nil {
+				bbo.BidPrice, bbo.BidSize, err = parseLevel(bid)
+				if err != nil {
+					log.Printf("hyperliquid: bbo multi bid parse error for %s: %v", raw.Data.Coin, err)
+					continue
+				}
+			}
+			if ask := raw.Data.Bbo[1]; ask != nil {
+				bbo.AskPrice, bbo.AskSize, err = parseLevel(ask)
+				if err != nil {
+					log.Printf("hyperliquid: bbo multi ask parse error for %s: %v", raw.Data.Coin, err)
 					continue
 				}
 			}

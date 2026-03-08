@@ -39,6 +39,28 @@ func (c *Client) newWsConn(ctx context.Context, subType string, params map[strin
 	return wc, nil
 }
 
+// newMuxWsConn creates a single websocket connection that supports multiple
+// subscriptions. Subscriptions are added via addSubscription before or after dialing.
+func (c *Client) newMuxWsConn(ctx context.Context, subs []map[string]string) (*wsConn, error) {
+	wc := &wsConn{
+		wsUrl: c.wsUrl,
+		subs:  subs,
+		msgCh: make(chan []byte, 256),
+	}
+	if err := wc.dial(); err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	c.conns = append(c.conns, wc)
+	c.mu.Unlock()
+
+	go wc.readLoop(c.bgCtx)
+	go wc.pingLoop(c.bgCtx)
+
+	return wc, nil
+}
+
 // Ping sends a ping on all active websocket connections.
 func (c *Client) Ping(ctx context.Context) error {
 	c.mu.Lock()
@@ -75,8 +97,22 @@ func (wc *wsConn) dial() error {
 		return fmt.Errorf("websocket dial: %w", err)
 	}
 
-	// Only subscribe if subType is set (skip for order posting connections).
-	if wc.subType != "" {
+	// Send all subscriptions (mux connections store them in subs).
+	wc.mu.Lock()
+	subs := make([]map[string]string, len(wc.subs))
+	copy(subs, wc.subs)
+	wc.mu.Unlock()
+
+	if len(subs) > 0 {
+		for _, subMap := range subs {
+			sub := wsSubscription{Method: "subscribe", Subscription: subMap}
+			if err := conn.WriteJSON(sub); err != nil {
+				conn.Close()
+				return fmt.Errorf("websocket subscribe: %w", err)
+			}
+		}
+	} else if wc.subType != "" {
+		// Legacy single-subscription path.
 		subMap := map[string]string{"type": wc.subType}
 		for k, v := range wc.subParams {
 			subMap[k] = v
