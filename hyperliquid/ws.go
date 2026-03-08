@@ -3,7 +3,6 @@ package hyperliquid
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -172,9 +171,7 @@ func (wc *wsConn) reconnect(ctx context.Context) error {
 		}
 		wc.mu.Unlock()
 
-		log.Printf("hyperliquid: reconnecting %s (backoff %v)", wc.subType, backoff)
 		if err := wc.dial(); err != nil {
-			log.Printf("hyperliquid: reconnect failed %s: %v", wc.subType, err)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -183,7 +180,6 @@ func (wc *wsConn) reconnect(ctx context.Context) error {
 			backoff = min(backoff*2, maxReconnectBackoff)
 			continue
 		}
-		log.Printf("hyperliquid: reconnected %s", wc.subType)
 		return nil
 	}
 }
@@ -216,7 +212,6 @@ func (wc *wsConn) readLoop(ctx context.Context) {
 
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("hyperliquid: %s read error: %v", wc.subType, err)
 			// Only nil/close the conn if it's still the one we were reading from.
 			// If Reconnect() already replaced it, just loop back to read from the new one.
 			wc.mu.Lock()
@@ -248,7 +243,6 @@ func (wc *wsConn) pingLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := wc.ping(); err != nil {
-				log.Printf("%v", err)
 				// Close the connection to unblock readLoop, which will trigger reconnection.
 				wc.mu.Lock()
 				if wc.conn != nil {
