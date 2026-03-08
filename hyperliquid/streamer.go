@@ -200,14 +200,14 @@ func (c *Client) StreamPositions(ctx context.Context) (<-chan exchangeclients.Cl
 
 			state := exchangeclients.ClearinghouseState{
 				MarginSummary: exchangeclients.MarginSummary{
-					AccountValue:    decOrZero(raw.Data.MarginSummary.AccountValue),
-					TotalNtlPos:     decOrZero(raw.Data.MarginSummary.TotalNtlPos),
-					TotalRawUsd:     decOrZero(raw.Data.MarginSummary.TotalRawUsd),
-					TotalMarginUsed: decOrZero(raw.Data.MarginSummary.TotalMarginUsed),
+					AccountValue:    decOrZero(raw.Data.ClearinghouseState.MarginSummary.AccountValue),
+					TotalNtlPos:     decOrZero(raw.Data.ClearinghouseState.MarginSummary.TotalNtlPos),
+					TotalRawUsd:     decOrZero(raw.Data.ClearinghouseState.MarginSummary.TotalRawUsd),
+					TotalMarginUsed: decOrZero(raw.Data.ClearinghouseState.MarginSummary.TotalMarginUsed),
 				},
 			}
 
-			for _, ap := range raw.Data.AssetPositions {
+			for _, ap := range raw.Data.ClearinghouseState.AssetPositions {
 				p := ap.Position
 				state.Positions = append(state.Positions, exchangeclients.Position{
 					Coin:           p.Coin,

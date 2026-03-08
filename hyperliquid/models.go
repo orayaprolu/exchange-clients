@@ -237,8 +237,12 @@ type wsBasicOrder struct {
 // Wire types for clearinghouse state subscription.
 
 type wsClearinghouseMessage struct {
-	Channel string                `json:"channel"`
-	Data    wsClearinghouseState  `json:"data"`
+	Channel string                   `json:"channel"`
+	Data    wsClearinghouseEnvelope  `json:"data"`
+}
+
+type wsClearinghouseEnvelope struct {
+	ClearinghouseState wsClearinghouseState `json:"clearinghouseState"`
 }
 
 type wsClearinghouseState struct {
