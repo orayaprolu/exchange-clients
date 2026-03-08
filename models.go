@@ -54,10 +54,12 @@ type PlaceOrderRequest struct {
 }
 
 type PlaceOrderResponse struct {
-	Status  string
-	OrderID string
-	Cloid   string
-	Error   string
+	Status    string
+	OrderID   string
+	Cloid     string
+	Error     string
+	TotalSize string // filled size for partial/full fills
+	AvgPrice  string // average fill price
 }
 
 type CancelOrderRequest struct {
@@ -101,6 +103,29 @@ type OrderUpdate struct {
 	Timestamp       int64
 	Status          string // e.g. "open", "filled", "canceled", "triggered", "rejected", "marginCanceled"
 	StatusTimestamp int64
+}
+
+type Position struct {
+	Coin           string
+	Size           decimal.Decimal // signed: positive = long, negative = short
+	EntryPx        decimal.Decimal
+	MarkPx         decimal.Decimal
+	LiquidationPx  decimal.Decimal
+	UnrealizedPnl  decimal.Decimal
+	ReturnOnEquity decimal.Decimal
+	MarginUsed     decimal.Decimal
+}
+
+type MarginSummary struct {
+	AccountValue    decimal.Decimal
+	TotalNtlPos     decimal.Decimal
+	TotalRawUsd     decimal.Decimal
+	TotalMarginUsed decimal.Decimal
+}
+
+type ClearinghouseState struct {
+	Positions     []Position
+	MarginSummary MarginSummary
 }
 
 type FundingRate struct {

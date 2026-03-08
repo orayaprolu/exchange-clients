@@ -171,6 +171,71 @@ func (c *Client) StreamOrderUpdates(ctx context.Context) (<-chan exchangeclients
 	return ch, nil
 }
 
+func (c *Client) StreamPositions(ctx context.Context) (<-chan exchangeclients.ClearinghouseState, error) {
+	if c.privateKey == nil {
+		return nil, fmt.Errorf("hyperliquid: private key required for position streaming")
+	}
+
+	params := map[string]string{"user": c.address.Hex()}
+	if c.exchange != "" {
+		params["dex"] = c.exchange
+	}
+
+	wc, err := c.newWsConn(ctx, "clearinghouseState", params)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan exchangeclients.ClearinghouseState, 64)
+	go func() {
+		defer close(ch)
+		for msg := range wc.msgCh {
+			var raw wsClearinghouseMessage
+			if err := json.Unmarshal(msg, &raw); err != nil {
+				continue
+			}
+			if raw.Channel != "clearinghouseState" {
+				continue
+			}
+
+			state := exchangeclients.ClearinghouseState{
+				MarginSummary: exchangeclients.MarginSummary{
+					AccountValue:    decOrZero(raw.Data.MarginSummary.AccountValue),
+					TotalNtlPos:     decOrZero(raw.Data.MarginSummary.TotalNtlPos),
+					TotalRawUsd:     decOrZero(raw.Data.MarginSummary.TotalRawUsd),
+					TotalMarginUsed: decOrZero(raw.Data.MarginSummary.TotalMarginUsed),
+				},
+			}
+
+			for _, ap := range raw.Data.AssetPositions {
+				p := ap.Position
+				state.Positions = append(state.Positions, exchangeclients.Position{
+					Coin:           p.Coin,
+					Size:           decOrZero(p.Szi),
+					EntryPx:        decOrZero(p.EntryPx),
+					MarkPx:         decOrZero(p.MarkPx),
+					LiquidationPx:  decOrZero(p.LiquidationPx),
+					UnrealizedPnl:  decOrZero(p.UnrealizedPnl),
+					ReturnOnEquity: decOrZero(p.ReturnOnEquity),
+					MarginUsed:     decOrZero(p.MarginUsed),
+				})
+			}
+
+			select {
+			case ch <- state:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func decOrZero(s string) decimal.Decimal {
+	d, _ := decimal.NewFromString(s)
+	return d
+}
+
 func parseLevel(l *wsLevel) (decimal.Decimal, decimal.Decimal, error) {
 	price, err := decimal.NewFromString(l.Px)
 	if err != nil {

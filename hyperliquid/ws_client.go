@@ -131,14 +131,8 @@ func (c *Client) sendWsAction(ctx context.Context, action any) (wsPostResponse, 
 		c.pendingMu.Unlock()
 	}()
 
-	oc.mu.Lock()
-	conn := oc.conn
-	oc.mu.Unlock()
-	if conn == nil {
-		return wsPostResponse{}, fmt.Errorf("hyperliquid: no active order connection")
-	}
-	if err := conn.WriteJSON(postReq); err != nil {
-		return wsPostResponse{}, fmt.Errorf("hyperliquid: ws write: %w", err)
+	if err := c.writeOrder(ctx, oc, postReq); err != nil {
+		return wsPostResponse{}, err
 	}
 
 	select {
@@ -147,6 +141,38 @@ func (c *Client) sendWsAction(ctx context.Context, action any) (wsPostResponse, 
 	case <-ctx.Done():
 		return wsPostResponse{}, ctx.Err()
 	}
+}
+
+// writeOrder writes a request to the order connection, reconnecting once on failure.
+func (c *Client) writeOrder(ctx context.Context, oc *wsConn, req wsPostRequest) error {
+	oc.mu.Lock()
+	conn := oc.conn
+	oc.mu.Unlock()
+
+	if conn == nil {
+		if err := oc.reconnect(ctx); err != nil {
+			return fmt.Errorf("hyperliquid: order reconnect: %w", err)
+		}
+	} else if err := conn.WriteJSON(req); err == nil {
+		return nil // write succeeded
+	} else {
+		log.Printf("hyperliquid: ws write failed, reconnecting: %v", err)
+	}
+
+	// Reconnect if we haven't already, then retry once.
+	if err := oc.reconnect(ctx); err != nil {
+		return fmt.Errorf("hyperliquid: order reconnect: %w", err)
+	}
+	oc.mu.Lock()
+	conn = oc.conn
+	oc.mu.Unlock()
+	if conn == nil {
+		return fmt.Errorf("hyperliquid: no active order connection after reconnect")
+	}
+	if err := conn.WriteJSON(req); err != nil {
+		return fmt.Errorf("hyperliquid: ws write after reconnect: %w", err)
+	}
+	return nil
 }
 
 // PlaceOrderWs places an order over the websocket connection.
@@ -256,6 +282,10 @@ func parseWsPayload(resp wsPostResponse) (status string, statuses []json.RawMess
 }
 
 func parseOrderResponse(resp wsPostResponse) exchangeclients.PlaceOrderResponse {
+	// Debug: log raw response
+	rawRespDebug, _ := json.Marshal(resp)
+	log.Printf("DEBUG: Raw order response: %s", string(rawRespDebug))
+
 	status, statuses, rawResp := parseWsPayload(resp)
 
 	if status != "ok" {

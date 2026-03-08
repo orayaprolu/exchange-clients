@@ -229,6 +229,41 @@ type wsBasicOrder struct {
 	Cloid     string `json:"cloid,omitempty"`
 }
 
+// Wire types for clearinghouse state subscription.
+
+type wsClearinghouseMessage struct {
+	Channel string                `json:"channel"`
+	Data    wsClearinghouseState  `json:"data"`
+}
+
+type wsClearinghouseState struct {
+	AssetPositions []wsAssetPosition `json:"assetPositions"`
+	MarginSummary  wsMarginSummary   `json:"marginSummary"`
+}
+
+type wsAssetPosition struct {
+	Type     string     `json:"type"`
+	Position wsPosition `json:"position"`
+}
+
+type wsPosition struct {
+	Coin           string `json:"coin"`
+	Szi            string `json:"szi"`
+	EntryPx        string `json:"entryPx"`
+	MarkPx         string `json:"markPx"`
+	LiquidationPx  string `json:"liquidationPx"`
+	UnrealizedPnl  string `json:"unrealizedPnl"`
+	ReturnOnEquity string `json:"returnOnEquity"`
+	MarginUsed     string `json:"marginUsed"`
+}
+
+type wsMarginSummary struct {
+	AccountValue    string `json:"accountValue"`
+	TotalNtlPos     string `json:"totalNtlPos"`
+	TotalRawUsd     string `json:"totalRawUsd"`
+	TotalMarginUsed string `json:"totalMarginUsed"`
+}
+
 // Meta endpoint types for asset index mapping.
 
 type wsMeta struct {

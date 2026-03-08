@@ -11,6 +11,7 @@ import (
 
 const (
 	pingInterval        = 50 * time.Second
+	aliveTimeout        = 70 * time.Second // must receive something within this window (ping response, data, etc.)
 	reconnectBackoff    = 1 * time.Second
 	maxReconnectBackoff = 30 * time.Second
 )
@@ -91,6 +92,7 @@ func (wc *wsConn) dial() error {
 	wc.mu.Lock()
 	wc.conn = conn
 	wc.mu.Unlock()
+	wc.resetReadDeadline()
 	return nil
 }
 
@@ -106,6 +108,15 @@ func (c *Client) getOrderConn(ctx context.Context) (*wsConn, error) {
 		go c.orderResponseLoop(ctx)
 	})
 	return c.orderConn, c.orderConnErr
+}
+
+// resetReadDeadline extends the read deadline so stale connections are detected.
+func (wc *wsConn) resetReadDeadline() {
+	wc.mu.Lock()
+	if wc.conn != nil {
+		wc.conn.SetReadDeadline(time.Now().Add(aliveTimeout))
+	}
+	wc.mu.Unlock()
 }
 
 func (wc *wsConn) ping() error {
@@ -203,6 +214,8 @@ func (wc *wsConn) readLoop(ctx context.Context) {
 			continue
 		}
 
+		wc.resetReadDeadline()
+
 		select {
 		case wc.msgCh <- msg:
 		case <-ctx.Done():
@@ -222,6 +235,13 @@ func (wc *wsConn) pingLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := wc.ping(); err != nil {
 				log.Printf("%v", err)
+				// Close the connection to unblock readLoop, which will trigger reconnection.
+				wc.mu.Lock()
+				if wc.conn != nil {
+					wc.conn.Close()
+					wc.conn = nil
+				}
+				wc.mu.Unlock()
 			}
 		}
 	}
