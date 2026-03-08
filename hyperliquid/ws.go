@@ -16,6 +16,9 @@ const (
 	maxReconnectBackoff = 30 * time.Second
 )
 
+// newWsConn creates a websocket connection and starts background goroutines
+// (readLoop, pingLoop) using the client's background context.
+// The caller's ctx is ignored for the WS lifecycle; use Close() to shut down.
 func (c *Client) newWsConn(ctx context.Context, subType string, params map[string]string) (*wsConn, error) {
 	wc := &wsConn{
 		wsUrl:     c.wsUrl,
@@ -31,8 +34,8 @@ func (c *Client) newWsConn(ctx context.Context, subType string, params map[strin
 	c.conns = append(c.conns, wc)
 	c.mu.Unlock()
 
-	go wc.readLoop(ctx)
-	go wc.pingLoop(ctx)
+	go wc.readLoop(c.bgCtx)
+	go wc.pingLoop(c.bgCtx)
 
 	return wc, nil
 }
@@ -100,7 +103,7 @@ func (wc *wsConn) dial() error {
 // Uses the client's background context so goroutines outlive any individual order.
 func (c *Client) getOrderConn(ctx context.Context) (*wsConn, error) {
 	c.orderConnOnce.Do(func() {
-		wc, err := c.newWsConn(c.bgCtx, "", nil)
+		wc, err := c.newWsConn(ctx, "", nil)
 		if err != nil {
 			c.orderConnErr = err
 			return
