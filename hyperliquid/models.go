@@ -173,17 +173,19 @@ type httpExchangeResponse struct {
 // Wire type for order response from websocket.
 
 type wsPostResponse struct {
-	Channel string `json:"channel"`
-	Data    struct {
-		ID       int64 `json:"id"`
-		Response struct {
-			Type    string `json:"type"`
-			Payload struct {
-				Status   string          `json:"status"`
-				Response json.RawMessage `json:"response"`
-			} `json:"payload"`
-		} `json:"response"`
-	} `json:"data"`
+	Channel string          `json:"channel"`
+	Data    json.RawMessage `json:"data"`
+}
+
+type wsPostResponseData struct {
+	ID       json.Number `json:"id"`
+	Response struct {
+		Type    string `json:"type"`
+		Payload struct {
+			Status   string          `json:"status"`
+			Response json.RawMessage `json:"response"`
+		} `json:"payload"`
+	} `json:"response"`
 }
 
 type wsPayloadResponse struct {

@@ -235,12 +235,22 @@ func (c *Client) orderResponseLoop(ctx context.Context) {
 
 			var resp wsPostResponse
 			if err := json.Unmarshal(msg, &resp); err != nil {
-				log.Printf("hyperliquid: order response unmarshal error: %v", err)
 				continue
 			}
 
-			id := resp.Data.ID
-			if id == 0 {
+			// Skip messages where data is not a JSON object (e.g. subscription
+			// acks where data is a plain string like "Subscribed").
+			if len(resp.Data) == 0 || resp.Data[0] != '{' {
+				continue
+			}
+
+			var data wsPostResponseData
+			if err := json.Unmarshal(resp.Data, &data); err != nil {
+				continue
+			}
+
+			id, err := data.ID.Int64()
+			if err != nil || id == 0 {
 				continue
 			}
 
@@ -261,7 +271,11 @@ func (c *Client) orderResponseLoop(ctx context.Context) {
 // parseWsPayload extracts statuses from the ws payload response.
 // The response field can be either a structured object or a plain string.
 func parseWsPayload(resp wsPostResponse) (status string, statuses []json.RawMessage, rawResp string) {
-	p := resp.Data.Response.Payload
+	var data wsPostResponseData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return "error", nil, fmt.Sprintf("unmarshal data: %v", err)
+	}
+	p := data.Response.Payload
 	status = p.Status
 
 	var pr wsPayloadResponse
