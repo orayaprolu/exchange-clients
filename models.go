@@ -138,3 +138,15 @@ type FundingRate struct {
 	DayVolume    decimal.Decimal
 	PrevDayPrice decimal.Decimal
 }
+
+type Trade struct {
+	Coin   string
+	Side   string
+	Price  decimal.Decimal
+	Size   decimal.Decimal
+	Hash   string
+	Time   int64
+	TID    int64
+	Buyer  string
+	Seller string
+}

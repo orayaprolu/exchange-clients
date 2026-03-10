@@ -6,6 +6,7 @@ type Streamer interface {
 	WsConn
 	StreamOrderbook(ctx context.Context, pair string) (<-chan Orderbook, error)
 	StreamBBO(ctx context.Context, pair string) (<-chan BBO, error)
+	StreamTrades(ctx context.Context, pair string) (<-chan Trade, error)
 	StreamOrderUpdates(ctx context.Context) (<-chan OrderUpdate, error)
 	StreamPositions(ctx context.Context) (<-chan ClearinghouseState, error)
 }

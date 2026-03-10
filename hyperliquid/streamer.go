@@ -229,6 +229,131 @@ func (c *Client) StreamBBOMulti(ctx context.Context, pairs []string) (<-chan exc
 	return ch, nil
 }
 
+func (c *Client) StreamTrades(ctx context.Context, pair string) (<-chan exchangeclients.Trade, error) {
+	coin, err := c.streamCoin(ctx, pair)
+	if err != nil {
+		return nil, err
+	}
+	wc, err := c.newWsConn(ctx, "trades", map[string]string{"coin": coin})
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan exchangeclients.Trade, 64)
+	go func() {
+		defer close(ch)
+		for msg := range wc.msgCh {
+			var raw wsTradeMessage
+			if err := json.Unmarshal(msg, &raw); err != nil {
+				log.Printf("hyperliquid: trades unmarshal error for %s: %v", pair, err)
+				continue
+			}
+			if raw.Channel != "trades" {
+				continue
+			}
+
+			for _, t := range raw.Data {
+				px, err := decimal.NewFromString(t.Px)
+				if err != nil {
+					log.Printf("hyperliquid: trade parse px %q: %v", t.Px, err)
+					continue
+				}
+				sz, err := decimal.NewFromString(t.Sz)
+				if err != nil {
+					log.Printf("hyperliquid: trade parse sz %q: %v", t.Sz, err)
+					continue
+				}
+
+				trade := exchangeclients.Trade{
+					Coin:   t.Coin,
+					Side:   t.Side,
+					Price:  px,
+					Size:   sz,
+					Hash:   t.Hash,
+					Time:   t.Time,
+					TID:    t.TID,
+					Buyer:  t.Users[0],
+					Seller: t.Users[1],
+				}
+
+				select {
+				case ch <- trade:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ch, nil
+}
+
+func (c *Client) StreamTradesMulti(ctx context.Context, pairs []string) (<-chan exchangeclients.Trade, error) {
+	if len(pairs) == 0 {
+		return nil, fmt.Errorf("hyperliquid: StreamTradesMulti requires at least one pair")
+	}
+
+	var subs []map[string]string
+	for _, pair := range pairs {
+		coin, err := c.streamCoin(ctx, pair)
+		if err != nil {
+			return nil, err
+		}
+		subs = append(subs, map[string]string{"type": "trades", "coin": coin})
+	}
+
+	wc, err := c.newMuxWsConn(ctx, subs)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan exchangeclients.Trade, 64)
+	go func() {
+		defer close(ch)
+		for msg := range wc.msgCh {
+			var raw wsTradeMessage
+			if err := json.Unmarshal(msg, &raw); err != nil {
+				log.Printf("hyperliquid: trades multi unmarshal error: %v", err)
+				continue
+			}
+			if raw.Channel != "trades" {
+				continue
+			}
+
+			for _, t := range raw.Data {
+				px, err := decimal.NewFromString(t.Px)
+				if err != nil {
+					log.Printf("hyperliquid: trade multi parse px %q: %v", t.Px, err)
+					continue
+				}
+				sz, err := decimal.NewFromString(t.Sz)
+				if err != nil {
+					log.Printf("hyperliquid: trade multi parse sz %q: %v", t.Sz, err)
+					continue
+				}
+
+				trade := exchangeclients.Trade{
+					Coin:   t.Coin,
+					Side:   t.Side,
+					Price:  px,
+					Size:   sz,
+					Hash:   t.Hash,
+					Time:   t.Time,
+					TID:    t.TID,
+					Buyer:  t.Users[0],
+					Seller: t.Users[1],
+				}
+
+				select {
+				case ch <- trade:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return ch, nil
+}
+
 func (c *Client) StreamOrderUpdates(ctx context.Context) (<-chan exchangeclients.OrderUpdate, error) {
 	if c.privateKey == nil {
 		return nil, fmt.Errorf("hyperliquid: private key required for order updates")
@@ -269,15 +394,15 @@ func (c *Client) StreamOrderUpdates(ctx context.Context) (<-chan exchangeclients
 				}
 
 				update := exchangeclients.OrderUpdate{
-					Coin:           wu.Order.Coin,
-					Side:           wu.Order.Side,
-					LimitPx:        limitPx,
-					Size:           sz,
-					OrigSize:       origSz,
-					OrderID:        wu.Order.OID,
-					Cloid:          wu.Order.Cloid,
-					Timestamp:      wu.Order.Timestamp,
-					Status:         wu.Status,
+					Coin:            wu.Order.Coin,
+					Side:            wu.Order.Side,
+					LimitPx:         limitPx,
+					Size:            sz,
+					OrigSize:        origSz,
+					OrderID:         wu.Order.OID,
+					Cloid:           wu.Order.Cloid,
+					Timestamp:       wu.Order.Timestamp,
+					Status:          wu.Status,
 					StatusTimestamp: wu.StatusTimestamp,
 				}
 

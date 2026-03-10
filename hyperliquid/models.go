@@ -45,7 +45,7 @@ type Client struct {
 type wsConn struct {
 	wsUrl     string
 	subType   string
-	subParams map[string]string // extra subscription params (e.g. "coin" or "user")
+	subParams map[string]string   // extra subscription params (e.g. "coin" or "user")
 	subs      []map[string]string // multiple subscriptions (for mux connections)
 	conn      *websocket.Conn
 	mu        sync.Mutex
@@ -240,8 +240,8 @@ type wsBasicOrder struct {
 // Wire types for clearinghouse state subscription.
 
 type wsClearinghouseMessage struct {
-	Channel string                   `json:"channel"`
-	Data    wsClearinghouseEnvelope  `json:"data"`
+	Channel string                  `json:"channel"`
+	Data    wsClearinghouseEnvelope `json:"data"`
 }
 
 type wsClearinghouseEnvelope struct {
@@ -274,6 +274,22 @@ type wsMarginSummary struct {
 	TotalNtlPos     string `json:"totalNtlPos"`
 	TotalRawUsd     string `json:"totalRawUsd"`
 	TotalMarginUsed string `json:"totalMarginUsed"`
+}
+
+type wsTradeMessage struct {
+	Channel string    `json:"channel"`
+	Data    []wsTrade `json:"data"`
+}
+
+type wsTrade struct {
+	Coin  string    `json:"coin"`
+	Side  string    `json:"side"`
+	Px    string    `json:"px"`
+	Sz    string    `json:"sz"`
+	Hash  string    `json:"hash"`
+	Time  int64     `json:"time"`
+	TID   int64     `json:"tid"`
+	Users [2]string `json:"users"`
 }
 
 // Meta endpoint types for asset index mapping.
