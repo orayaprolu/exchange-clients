@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	exchangeclients "github.com/orayaprolu/exchange-clients"
@@ -26,9 +25,12 @@ func (c *Client) StreamOrderbook(ctx context.Context, pair string) (<-chan excha
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsBookMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: orderbook unmarshal error for %s: %v", pair, err)
 				continue
 			}
 			if raw.Channel != "l2Book" {
@@ -37,12 +39,10 @@ func (c *Client) StreamOrderbook(ctx context.Context, pair string) (<-chan excha
 
 			bids, err := convertLevels(raw.Data.Levels[0])
 			if err != nil {
-				log.Printf("hyperliquid: orderbook bid parse error for %s: %v", pair, err)
 				continue
 			}
 			asks, err := convertLevels(raw.Data.Levels[1])
 			if err != nil {
-				log.Printf("hyperliquid: orderbook ask parse error for %s: %v", pair, err)
 				continue
 			}
 
@@ -82,9 +82,12 @@ func (c *Client) StreamOrderbookMulti(ctx context.Context, pairs []string) (<-ch
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsBookMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: orderbook multi unmarshal error: %v", err)
 				continue
 			}
 			if raw.Channel != "l2Book" {
@@ -93,12 +96,10 @@ func (c *Client) StreamOrderbookMulti(ctx context.Context, pairs []string) (<-ch
 
 			bids, err := convertLevels(raw.Data.Levels[0])
 			if err != nil {
-				log.Printf("hyperliquid: orderbook multi bid parse error for %s: %v", raw.Data.Coin, err)
 				continue
 			}
 			asks, err := convertLevels(raw.Data.Levels[1])
 			if err != nil {
-				log.Printf("hyperliquid: orderbook multi ask parse error for %s: %v", raw.Data.Coin, err)
 				continue
 			}
 
@@ -129,9 +130,12 @@ func (c *Client) StreamBBO(ctx context.Context, pair string) (<-chan exchangecli
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsBboMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: bbo unmarshal error for %s: %v", pair, err)
 				continue
 			}
 			if raw.Channel != "bbo" {
@@ -142,14 +146,12 @@ func (c *Client) StreamBBO(ctx context.Context, pair string) (<-chan exchangecli
 			if bid := raw.Data.Bbo[0]; bid != nil {
 				bbo.BidPrice, bbo.BidSize, err = parseLevel(bid)
 				if err != nil {
-					log.Printf("hyperliquid: bbo bid parse error for %s: %v", pair, err)
 					continue
 				}
 			}
 			if ask := raw.Data.Bbo[1]; ask != nil {
 				bbo.AskPrice, bbo.AskSize, err = parseLevel(ask)
 				if err != nil {
-					log.Printf("hyperliquid: bbo ask parse error for %s: %v", pair, err)
 					continue
 				}
 			}
@@ -194,9 +196,12 @@ func (c *Client) StreamBBOMulti(ctx context.Context, pairs []string) (<-chan exc
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsBboMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: bbo multi unmarshal error: %v", err)
 				continue
 			}
 			if raw.Channel != "bbo" {
@@ -207,14 +212,12 @@ func (c *Client) StreamBBOMulti(ctx context.Context, pairs []string) (<-chan exc
 			if bid := raw.Data.Bbo[0]; bid != nil {
 				bbo.BidPrice, bbo.BidSize, err = parseLevel(bid)
 				if err != nil {
-					log.Printf("hyperliquid: bbo multi bid parse error for %s: %v", raw.Data.Coin, err)
 					continue
 				}
 			}
 			if ask := raw.Data.Bbo[1]; ask != nil {
 				bbo.AskPrice, bbo.AskSize, err = parseLevel(ask)
 				if err != nil {
-					log.Printf("hyperliquid: bbo multi ask parse error for %s: %v", raw.Data.Coin, err)
 					continue
 				}
 			}
@@ -243,9 +246,12 @@ func (c *Client) StreamTrades(ctx context.Context, pair string) (<-chan exchange
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsTradeMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: trades unmarshal error for %s: %v", pair, err)
 				continue
 			}
 			if raw.Channel != "trades" {
@@ -255,12 +261,10 @@ func (c *Client) StreamTrades(ctx context.Context, pair string) (<-chan exchange
 			for _, t := range raw.Data {
 				px, err := decimal.NewFromString(t.Px)
 				if err != nil {
-					log.Printf("hyperliquid: trade parse px %q: %v", t.Px, err)
 					continue
 				}
 				sz, err := decimal.NewFromString(t.Sz)
 				if err != nil {
-					log.Printf("hyperliquid: trade parse sz %q: %v", t.Sz, err)
 					continue
 				}
 
@@ -310,9 +314,12 @@ func (c *Client) StreamTradesMulti(ctx context.Context, pairs []string) (<-chan 
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsTradeMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				log.Printf("hyperliquid: trades multi unmarshal error: %v", err)
 				continue
 			}
 			if raw.Channel != "trades" {
@@ -322,12 +329,10 @@ func (c *Client) StreamTradesMulti(ctx context.Context, pairs []string) (<-chan 
 			for _, t := range raw.Data {
 				px, err := decimal.NewFromString(t.Px)
 				if err != nil {
-					log.Printf("hyperliquid: trade multi parse px %q: %v", t.Px, err)
 					continue
 				}
 				sz, err := decimal.NewFromString(t.Sz)
 				if err != nil {
-					log.Printf("hyperliquid: trade multi parse sz %q: %v", t.Sz, err)
 					continue
 				}
 
@@ -368,9 +373,13 @@ func (c *Client) StreamOrderUpdates(ctx context.Context) (<-chan exchangeclients
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsOrderUpdateMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
-				continue // subscription ack or non-array message
+				continue
 			}
 			if raw.Channel != "orderUpdates" {
 				continue
@@ -379,17 +388,14 @@ func (c *Client) StreamOrderUpdates(ctx context.Context) (<-chan exchangeclients
 			for _, wu := range raw.Data {
 				limitPx, err := decimal.NewFromString(wu.Order.LimitPx)
 				if err != nil {
-					log.Printf("hyperliquid: order update parse limitPx %q: %v", wu.Order.LimitPx, err)
 					continue
 				}
 				sz, err := decimal.NewFromString(wu.Order.Sz)
 				if err != nil {
-					log.Printf("hyperliquid: order update parse sz %q: %v", wu.Order.Sz, err)
 					continue
 				}
 				origSz, err := decimal.NewFromString(wu.Order.OrigSz)
 				if err != nil {
-					log.Printf("hyperliquid: order update parse origSz %q: %v", wu.Order.OrigSz, err)
 					continue
 				}
 
@@ -436,6 +442,10 @@ func (c *Client) StreamPositions(ctx context.Context) (<-chan exchangeclients.Cl
 	go func() {
 		defer close(ch)
 		for msg := range wc.msgCh {
+			var env wsMessage
+			if err := json.Unmarshal(msg, &env); err != nil || env.Channel == "subscriptionResponse" {
+				continue
+			}
 			var raw wsClearinghouseMessage
 			if err := json.Unmarshal(msg, &raw); err != nil {
 				continue

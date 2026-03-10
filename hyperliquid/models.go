@@ -276,6 +276,10 @@ type wsMarginSummary struct {
 	TotalMarginUsed string `json:"totalMarginUsed"`
 }
 
+type wsMessage struct {
+	Channel string `json:"channel"`
+}
+
 type wsTradeMessage struct {
 	Channel string    `json:"channel"`
 	Data    []wsTrade `json:"data"`
